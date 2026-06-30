@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Trustify Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, orderBy, onSnapshot, addDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  /* ════════════════════════════════════════
+     🔧 PASTE YOUR FIREBASE CONFIG HERE
+     ════════════════════════════════════════ */
+  const firebaseConfig = {
+    apiKey: "AIzaSyD-8JkLO2D5KWBBNE1zo18HEWDlocjR7go",
+    authDomain: "trustifywallet-a54fd.firebaseapp.com",
+    projectId: "trustifywallet-a54fd",
+    storageBucket: "trustifywallet-a54fd.firebasestorage.app",
+    messagingSenderId: "222093056146",
+    appId: "1:222093056146:web:9657a86de4da16c6a22e4b"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  window.FB = { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut,
+    collection, doc, getDoc, getDocs, setDoc, updateDoc, query, orderBy, onSnapshot, addDoc, serverTimestamp, where };
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0e1a; --bg2:#111827; --bg3:#1a2235;
+  --blue:#0052FF; --blue2:#3b82f6; --cyan:#00d4ff;
+  --green:#22c55e; --red:#ef4444; --gold:#f59e0b; --purple:#8b5cf6;
+  --text:#ffffff; --text2:#94a3b8; --text3:#4b5563;
+  --border:rgba(255,255,255,0.07); --card:rgba(255,255,255,0.04); --card2:rgba(255,255,255,0.08);
+  --r:16px; --r2:12px; --r3:8px;
+}
+html,body{height:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:99px}
+.hidden{display:none!important}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ── LOGIN SCREEN ── */
+#loginScreen{min-height:100dvh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:radial-gradient(ellipse at top,#0d1530 0%,#0a0e1a 60%)}
+.login-glow{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(0,82,255,.18) 0%,transparent 70%);top:-150px;left:50%;transform:translateX(-50%);pointer-events:none}
+.login-box{position:relative;z-index:1;width:380px;max-width:92vw;background:var(--bg2);border:1px solid var(--border);border-radius:24px;padding:40px 32px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.login-logo{display:flex;align-items:center;justify-content:center;gap:10px;font-size:22px;font-weight:800;margin-bottom:6px}
+.login-sub{text-align:center;color:var(--text2);font-size:13px;margin-bottom:28px}
+.login-field{margin-bottom:14px}
+.login-field label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block}
+.login-field input{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r2);padding:13px 14px;color:var(--text);font-size:14px;outline:none;transition:.2s;font-family:'Inter',sans-serif}
+.login-field input:focus{border-color:rgba(0,82,255,.5);background:rgba(0,82,255,.04)}
+.login-btn{width:100%;background:var(--blue);color:#fff;border:none;border-radius:var(--r2);padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:.2s;box-shadow:0 0 24px rgba(0,82,255,.35)}
+.login-btn:hover{box-shadow:0 0 36px rgba(0,82,255,.5);transform:translateY(-1px)}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-err{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--r3);padding:10px 14px;font-size:12px;color:#fca5a5;margin-top:12px}
+.login-note{text-align:center;font-size:11px;color:var(--text3);margin-top:20px}
+
+/* ── APP SHELL ── */
+#adminApp{display:flex;min-height:100dvh}
+.sidebar{width:240px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100dvh}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:22px 20px;font-size:18px;font-weight:800;border-bottom:1px solid var(--border)}
+.sb-nav{flex:1;padding:14px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.sb-link{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r2);color:var(--text2);text-decoration:none;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;border:none;background:none;width:100%;text-align:left}
+.sb-link:hover{background:var(--card);color:var(--text)}
+.sb-link.active{background:rgba(0,82,255,.14);color:var(--blue2)}
+.sb-link svg{flex-shrink:0}
+.sb-foot{padding:16px;border-top:1px solid var(--border)}
+.sb-user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--r2);margin-bottom:8px}
+.sb-avatar{width:32px;height:32px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.sb-uinfo{flex:1;min-width:0}
+.sb-uemail{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-urole{font-size:10px;color:var(--text3)}
+.sb-logout{width:100%;background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:9px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+.sb-logout:hover{background:rgba(239,68,68,.1);color:#fca5a5;border-color:rgba(239,68,68,.3)}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid var(--border);background:rgba(10,14,26,.7);backdrop-filter:blur(10px);position:sticky;top:0;z-index:10}
+.tb-title{font-size:20px;font-weight:800}
+.tb-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.live-badge{display:flex;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:700;color:#22c55e}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+
+.content{padding:28px;flex:1}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.blue::before{background:linear-gradient(90deg,var(--blue),var(--cyan))}
+.stat-card.green::before{background:linear-gradient(90deg,var(--green),#4ade80)}
+.stat-card.gold::before{background:linear-gradient(90deg,var(--gold),#fbbf24)}
+.stat-card.purple::before{background:linear-gradient(90deg,var(--purple),#a78bfa)}
+.stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.stat-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.stat-icon.blue{background:rgba(0,82,255,.15);color:var(--blue2)}
+.stat-icon.green{background:rgba(34,197,94,.15);color:var(--green)}
+.stat-icon.gold{background:rgba(245,158,11,.15);color:var(--gold)}
+.stat-icon.purple{background:rgba(139,92,246,.15);color:var(--purple)}
+.stat-trend{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px}
+.stat-trend.pos{background:rgba(34,197,94,.1);color:var(--green)}
+.stat-val{font-size:30px;font-weight:800;letter-spacing:-1px;margin-bottom:4px}
+.stat-lbl{font-size:13px;color:var(--text2)}
+
+/* ── TABLE / PANELS ── */
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:24px}
+.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px}
+.panel-title{font-size:16px;font-weight:700}
+.panel-actions{display:flex;gap:8px;align-items:center}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:8px 12px;min-width:220px}
+.search-box input{background:none;border:none;color:var(--text);font-size:13px;outline:none;flex:1;font-family:'Inter',sans-serif}
+.search-box input::placeholder{color:var(--text3)}
+.btn{background:var(--blue);color:#fff;border:none;border-radius:var(--r2);padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--blue2)}
+.btn.outline{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.btn.outline:hover{border-color:rgba(255,255,255,.25)}
+.btn.danger{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3)}
+.btn.danger:hover{background:rgba(239,68,68,.25)}
+.btn.sm{padding:6px 12px;font-size:12px}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:12px 22px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:14px 22px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.tbl-row{transition:.15s}
+tr.tbl-row:hover{background:var(--card)}
+.u-cell{display:flex;align-items:center;gap:10px}
+.u-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.u-name{font-weight:600;font-size:13px}
+.u-email{font-size:11px;color:var(--text2)}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:700}
+.badge.active{background:rgba(34,197,94,.12);color:var(--green)}
+.badge.pending{background:rgba(245,158,11,.12);color:var(--gold)}
+.badge.blocked{background:rgba(239,68,68,.12);color:var(--red)}
+.bal-amt{font-weight:700;font-size:14px}
+.empty-row{text-align:center;padding:50px 20px;color:var(--text3)}
+
+/* pagination */
+.pag{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)}
+.pag-btns{display:flex;gap:6px}
+.pag-btn{width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.pag-btn:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:20px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:17px;font-weight:800}
+.modal-close{width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:14px}
+.modal-body{padding:22px 24px}
+.field{margin-bottom:16px}
+.field label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;display:block}
+.field input,.field select,.field textarea{width:100%;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r2);padding:11px 14px;color:var(--text);font-size:14px;outline:none;font-family:'Inter',sans-serif;transition:.2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:rgba(0,82,255,.5)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-foot{display:flex;gap:10px;padding:18px 24px;border-top:1px solid var(--border)}
+.modal-foot .btn{flex:1;justify-content:center}
+.bal-current{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.bal-current-lbl{font-size:12px;color:var(--text2)}
+.bal-current-val{font-size:18px;font-weight:800}
+
+/* toast */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:14px 20px;font-size:13px;font-weight:600;box-shadow:0 12px 40px rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;gap:10px;transition:.3s}
+#toast.hidden{opacity:0;transform:translateY(20px);pointer-events:none}
+#toast.success{border-color:rgba(34,197,94,.3)}
+#toast.error{border-color:rgba(239,68,68,.3)}
+
+/* responsive */
+@media(max-width:880px){
+  .sidebar{position:fixed;left:-240px;z-index:200;transition:.3s;box-shadow:20px 0 60px rgba(0,0,0,.5)}
+  .sidebar.open{left:0}
+  .menu-btn{display:flex!important}
+  .field-row{grid-template-columns:1fr}
+  table{font-size:12px}
+  th,td{padding:10px 14px}
+}
+.menu-btn{display:none;width:36px;height:36px;border-radius:9px;background:var(--card);border:1px solid var(--border);color:var(--text);align-items:center;justify-content:center;cursor:pointer}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150}
+.sb-overlay.show{display:block}
+
+/* page sections */
+.page-section{display:none}
+.page-section.active{display:block}
+
+/* activity feed */
+.activity-item{display:flex;gap:12px;padding:14px 22px;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.act-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.act-info{flex:1}
+.act-title{font-size:13px;font-weight:600}
+.act-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.act-time{font-size:11px;color:var(--text3);white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div id="loginScreen">
+  <div class="login-glow"></div>
+  <div class="login-box">
+    <div class="login-logo">
+      <svg viewBox="0 0 28 32" width="24" fill="none">
+        <path d="M14 1L2 6v9c0 9 5.5 16 12 18 6.5-2 12-9 12-18V6z" fill="#0052FF"/>
+        <path d="M8.5 16.5l3.5 3.5 7.5-8" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      Trustify <span style="color:var(--text2);font-weight:600">Admin</span>
+    </div>
+    <div class="login-sub">Sign in to access the control panel</div>
+    <div class="login-field">
+      <label>Email Address</label>
+      <input type="email" id="loginEmail" placeholder="admin@trustify.com" autocomplete="email"/>
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+    <div id="loginErr" class="login-err hidden"></div>
+    <div class="login-note">Authorized personnel only · Trustify Admin Console</div>
+  </div>
+</div>
+
+<!-- ══════════ ADMIN APP ══════════ -->
+<div id="adminApp" class="hidden">
+  <div class="sb-overlay" id="sbOverlay" onclick="toggleSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <svg viewBox="0 0 28 32" width="22" fill="none">
+        <path d="M14 1L2 6v9c0 9 5.5 16 12 18 6.5-2 12-9 12-18V6z" fill="#0052FF"/>
+        <path d="M8.5 16.5l3.5 3.5 7.5-8" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      Trustify <span style="color:var(--text2);font-weight:600;font-size:14px">Admin</span>
+    </div>
+    <nav class="sb-nav">
+      <button class="sb-link active" onclick="showPage('dashboard',this)">
+        <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        Dashboard
+      </button>
+      <button class="sb-link" onclick="showPage('users',this)">
+        <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
+      </button>
+      <button class="sb-link" onclick="showPage('payments',this)">
+        <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Payment Requests
+      </button>
+      <button class="sb-link" onclick="showPage('transactions',this)">
+        <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Transactions
+      </button>
+      <button class="sb-link" onclick="showPage('settings',this)">
+        <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </nav>
+    <div class="sb-foot">
+      <div class="sb-user">
+        <div class="sb-avatar" id="sbAvatar">A</div>
+        <div class="sb-uinfo">
+          <div class="sb-uemail" id="sbEmail">admin@trustify.com</div>
+          <div class="sb-urole">Administrator</div>
+        </div>
+      </div>
+      <button class="sb-logout" onclick="doLogout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="menu-btn" onclick="toggleSidebar()">
+          <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <div class="tb-title" id="pageTitle">Dashboard</div>
+          <div class="tb-sub" id="pageSub">Overview of your platform</div>
+        </div>
+      </div>
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div id="page-dashboard" class="page-section active">
+        <div class="stat-grid">
+          <div class="stat-card blue">
+            <div class="stat-top"><div class="stat-icon blue">
+              <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div><span class="stat-trend pos" id="userTrend">+0</span></div>
+            <div class="stat-val" id="statTotalUsers">0</div>
+            <div class="stat-lbl">Total Users</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-top"><div class="stat-icon green">
+              <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div><span class="stat-trend pos">Total</span></div>
+            <div class="stat-val" id="statTotalBalance">$0.00</div>
+            <div class="stat-lbl">Platform Balance</div>
+          </div>
+          <div class="stat-card gold">
+            <div class="stat-top"><div class="stat-icon gold">
+              <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div><span class="stat-trend pos" id="pendingTrend">0</span></div>
+            <div class="stat-val" id="statPending">0</div>
+            <div class="stat-lbl">Pending Payments</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-top"><div class="stat-icon purple">
+              <svg viewBox="0 0 24 24" width="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+            </div><span class="stat-trend pos">24h</span></div>
+            <div class="stat-val" id="statTxCount">0</div>
+            <div class="stat-lbl">Transactions Today</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-hdr">
+            <div class="panel-title">Recent Activity</div>
+            <button class="btn outline sm" onclick="showPage('transactions',document.querySelectorAll('.sb-link')[3])">View All</button>
+          </div>
+          <div id="activityFeed">
+            <div class="empty-row">No activity yet</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-hdr">
+            <div class="panel-title">Recently Joined Users</div>
+            <button class="btn outline sm" onclick="showPage('users',document.querySelectorAll('.sb-link')[1])">View All</button>
+          </div>
+          <table>
+            <thead><tr><th>User</th><th>Joined</th><th>Balance</th><th>Status</th></tr></thead>
+            <tbody id="recentUsersBody"><tr><td colspan="4" class="empty-row">No users yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div id="page-users" class="page-section">
+        <div class="panel">
+          <div class="panel-hdr">
+            <div class="panel-title">All Users</div>
+            <div class="panel-actions">
+              <div class="search-box">
+                <svg viewBox="0 0 24 24" width="14" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="userSearch" placeholder="Search by email or name…" oninput="renderUsersTable()"/>
+              </div>
+              <button class="btn sm" onclick="loadUsers()">↺ Refresh</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>User</th><th>UID</th><th>Balance</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody id="usersTableBody"><tr><td colspan="6" class="empty-row">Loading users…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PAYMENTS -->
+      <div id="page-payments" class="page-section">
+        <div class="panel">
+          <div class="panel-hdr">
+            <div class="panel-title">Payment Requests</div>
+            <div class="panel-actions">
+              <button class="btn sm" onclick="loadPayments()">↺ Refresh</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody id="paymentsTableBody"><tr><td colspan="7" class="empty-row">No payment requests yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TRANSACTIONS -->
+      <div id="page-transactions" class="page-section">
+        <div class="panel">
+          <div class="panel-hdr">
+            <div class="panel-title">All Transactions</div>
+            <button class="btn sm" onclick="loadAllTransactions()">↺ Refresh</button>
+          </div>
+          <table>
+            <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Note</th><th>Date</th></tr></thead>
+            <tbody id="txTableBody"><tr><td colspan="5" class="empty-row">No transactions yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="page-settings" class="page-section">
+        <div class="panel">
+          <div class="panel-hdr"><div class="panel-title">Admin Account</div></div>
+          <div style="padding:22px">
+            <div class="field">
+              <label>Admin Email</label>
+              <input id="settingsEmail" disabled/>
+            </div>
+            <p style="font-size:12px;color:var(--text2);line-height:1.6">To add more admins, create their account in Firebase Authentication, then add their UID to the <code class="mono" style="background:var(--card);padding:2px 6px;border-radius:4px">admins</code> collection in Firestore.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-hdr"><div class="panel-title">Connection Info</div></div>
+          <div style="padding:22px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--text2)">Firebase Project</span><span class="mono" id="fbProjectId">—</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--text2)">Status</span><span style="color:var(--green);font-weight:700">✓ Connected</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ADJUST BALANCE MODAL ══════════ -->
+<div id="balanceModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title">Adjust User Balance</span>
+      <button class="modal-close" onclick="closeBalanceModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="bal-current">
+        <span class="bal-current-lbl">Current Balance</span>
+        <span class="bal-current-val" id="modalCurrentBal">$0.00</span>
+      </div>
+      <div class="field">
+        <label>User</label>
+        <input id="modalUserName" disabled/>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Action</label>
+          <select id="modalAction">
+            <option value="add">Add Funds (Credit)</option>
+            <option value="subtract">Deduct Funds (Debit)</option>
+            <option value="set">Set Exact Balance</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Amount (USD)</label>
+          <input id="modalAmount" type="number" step="0.01" placeholder="0.00"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Note / Reason</label>
+        <textarea id="modalNote" rows="2" placeholder="e.g. UPI payment received, Ref: 1234567890"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn outline" onclick="closeBalanceModal()">Cancel</button>
+      <button class="btn" onclick="submitBalanceChange()">Confirm & Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ USER DETAIL MODAL ══════════ -->
+<div id="userDetailModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title">User Details</span>
+      <button class="modal-close" onclick="closeUserDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="userDetailBody">
+      <!-- filled dynamically -->
+    </div>
+    <div class="modal-foot">
+      <button class="btn outline" onclick="closeUserDetail()">Close</button>
+      <button class="btn" onclick="openBalanceModalFromDetail()">Adjust Balance</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script>
+/* ════════════════════════════════════════
+   TRUSTIFY ADMIN — Dashboard Logic
+   ════════════════════════════════════════ */
+
+let FB = null;
+let currentAdmin = null;
+let allUsers = [];
+let allPayments = [];
+let allTx = [];
+let selectedUserId = null;
+
+window.addEventListener('firebase-ready', () => {
+  FB = window.FB;
+  document.getElementById('fbProjectId').textContent = FB.auth.app.options.projectId || '—';
+
+  FB.onAuthStateChanged(FB.auth, (user) => {
+    if (user) {
+      currentAdmin = user;
+      showAdminApp();
+    } else {
+      showLogin();
+    }
+  });
+});
+
+function showLogin() {
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('adminApp').classList.add('hidden');
+}
+
+function showAdminApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('adminApp').classList.remove('hidden');
+  document.getElementById('sbEmail').textContent = currentAdmin.email;
+  document.getElementById('sbAvatar').textContent = currentAdmin.email[0].toUpperCase();
+  document.getElementById('settingsEmail').value = currentAdmin.email;
+  loadDashboard();
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginErr');
+  const btn   = document.getElementById('loginBtn');
+  errEl.classList.add('hidden');
+
+  if (!email || !pass) {
+    errEl.textContent = 'Please enter email and password.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    await FB.signInWithEmailAndPassword(FB.auth, email, pass);
+  } catch (e) {
+    errEl.textContent = mapAuthError(e.code);
+    errEl.classList.remove('hidden');
+  }
+  btn.disabled = false; btn.textContent = 'Sign In';
+}
+
+function mapAuthError(code) {
+  const map = {
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/user-not-found': 'No admin account found with this email.',
+    'auth/wrong-password': 'Incorrect password.',
+    'auth/too-many-requests': 'Too many attempts. Try again later.',
+    'auth/invalid-email': 'Invalid email format.',
+  };
+  return map[code] || 'Login failed. Please try again.';
+}
+
+function doLogout() {
+  if (confirm('Sign out of admin panel?')) {
+    FB.signOut(FB.auth);
+  }
+}
+
+// ── NAVIGATION ──
+function showPage(page, btn) {
+  document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.sb-link').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const titles = {
+    dashboard: ['Dashboard', 'Overview of your platform'],
+    users: ['Users', 'Manage all registered users'],
+    payments: ['Payment Requests', 'Review and approve incoming payments'],
+    transactions: ['Transactions', 'Full transaction history across all users'],
+    settings: ['Settings', 'Admin account and configuration'],
+  };
+  document.getElementById('pageTitle').textContent = titles[page][0];
+  document.getElementById('pageSub').textContent = titles[page][1];
+
+  if (page === 'users') loadUsers();
+  if (page === 'payments') loadPayments();
+  if (page === 'transactions') loadAllTransactions();
+
+  if (window.innerWidth <= 880) toggleSidebar(false);
+}
+
+function toggleSidebar(force) {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sbOverlay');
+  const open = force !== undefined ? force : !sb.classList.contains('open');
+  sb.classList.toggle('open', open);
+  ov.classList.toggle('show', open);
+}
+
+// ── DASHBOARD ──
+async function loadDashboard() {
+  try {
+    const usersSnap = await FB.getDocs(FB.collection(FB.db, 'users'));
+    allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    document.getElementById('statTotalUsers').textContent = allUsers.length;
+    const totalBal = allUsers.reduce((s, u) => s + (parseFloat(u.balance) || 0), 0);
+    document.getElementById('statTotalBalance').textContent = '$' + totalBal.toFixed(2);
+
+    // Recent users (last 5)
+    const sorted = [...allUsers].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+    const recentBody = document.getElementById('recentUsersBody');
+    if (!sorted.length) {
+      recentBody.innerHTML = '<tr><td colspan="4" class="empty-row">No users yet — they\\'ll appear here once people sign up.</td></tr>';
+    } else {
+      recentBody.innerHTML = sorted.slice(0,5).map(u => `
+        <tr class="tbl-row" style="cursor:pointer" onclick="openUserDetail('${u.id}')">
+          <td><div class="u-cell"><div class="u-avatar">${(u.email||'?')[0].toUpperCase()}</div><div><div class="u-name">${u.name||u.email||'Unknown'}</div><div class="u-email">${u.email||''}</div></div></div></td>
+          <td>${fmtDate(u.createdAt)}</td>
+          <td class="bal-amt">$${(parseFloat(u.balance)||0).toFixed(2)}</td>
+          <td><span class="badge ${u.status||'active'}">${(u.status||'active')}</span></td>
+        </tr>`).join('');
+    }
+
+    // Pending payments count
+    const paySnap = await FB.getDocs(FB.query(FB.collection(FB.db,'paymentRequests'), FB.where('status','==','pending')));
+    document.getElementById('statPending').textContent = paySnap.size;
+    document.getElementById('pendingTrend').textContent = paySnap.size > 0 ? 'Needs review' : 'All clear';
+
+    // Today's transactions
+    const txSnap = await FB.getDocs(FB.collection(FB.db,'transactions'));
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayTx = txSnap.docs.filter(d => {
+      const ts = d.data().createdAt?.seconds;
+      return ts && new Date(ts*1000) >= today;
+    });
+    document.getElementById('statTxCount').textContent = todayTx.length;
+
+    // activity feed (latest 8 tx across all users)
+    const allTxData = txSnap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).slice(0,8);
+    const feedEl = document.getElementById('activityFeed');
+    if (!allTxData.length) {
+      feedEl.innerHTML = '<div class="empty-row">No activity yet</div>';
+    } else {
+      feedEl.innerHTML = allTxData.map(tx => {
+        const isCredit = tx.type === 'credit' || tx.amount > 0;
+        return `<div class="activity-item">
+          <div class="act-icon" style="background:${isCredit?'rgba(34,197,94,.12)':'rgba(239,68,68,.12)'};color:${isCredit?'#22c55e':'#ef4444'}">${isCredit?'↓':'↑'}</div>
+          <div class="act-info">
+            <div class="act-title">${tx.userEmail||'User'} — ${isCredit?'received':'sent'} $${Math.abs(tx.amount||0).toFixed(2)}</div>
+            <div class="act-sub">${tx.note||'No note'}</div>
+          </div>
+          <div class="act-time">${fmtDate(tx.createdAt)}</div>
+        </div>`;
+      }).join('');
+    }
+  } catch(e) {
+    console.error(e);
+    toast('Failed to load dashboard: ' + e.message, 'error');
+  }
+}
+
+// ── USERS ──
+async function loadUsers() {
+  const tbody = document.getElementById('usersTableBody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Loading…</td></tr>';
+  try {
+    const snap = await FB.getDocs(FB.collection(FB.db, 'users'));
+    allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderUsersTable();
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-row">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderUsersTable() {
+  const q = document.getElementById('userSearch').value.toLowerCase();
+  const filtered = allUsers.filter(u =>
+    (u.email||'').toLowerCase().includes(q) || (u.name||'').toLowerCase().includes(q)
+  );
+  const tbody = document.getElementById('usersTableBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No users found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(u => `
+    <tr class="tbl-row">
+      <td><div class="u-cell"><div class="u-avatar">${(u.email||'?')[0].toUpperCase()}</div><div><div class="u-name">${u.name||'Unnamed'}</div><div class="u-email">${u.email||''}</div></div></div></td>
+      <td class="mono" style="font-size:11px;color:var(--text3)">${u.id.slice(0,10)}…</td>
+      <td class="bal-amt">$${(parseFloat(u.balance)||0).toFixed(2)}</td>
+      <td><span class="badge ${u.status||'active'}">${u.status||'active'}</span></td>
+      <td>${fmtDate(u.createdAt)}</td>
+      <td>
+        <button class="btn sm" onclick="openBalanceModal('${u.id}')">💰 Balance</button>
+        <button class="btn outline sm" onclick="openUserDetail('${u.id}')" style="margin-left:6px">View</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openUserDetail(uid) {
+  const u = allUsers.find(x => x.id === uid);
+  if (!u) return;
+  selectedUserId = uid;
+  document.getElementById('userDetailBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <div class="u-avatar" style="width:50px;height:50px;font-size:18px">${(u.email||'?')[0].toUpperCase()}</div>
+      <div><div style="font-size:16px;font-weight:700">${u.name||'Unnamed User'}</div><div style="font-size:13px;color:var(--text2)">${u.email||''}</div></div>
+    </div>
+    <div class="field-row" style="margin-bottom:16px">
+      <div class="bal-current" style="margin:0"><div><div class="bal-current-lbl">Balance</div><div class="bal-current-val">$${(parseFloat(u.balance)||0).toFixed(2)}</div></div></div>
+      <div class="bal-current" style="margin:0"><div><div class="bal-current-lbl">Status</div><div class="bal-current-val" style="font-size:14px"><span class="badge ${u.status||'active'}">${u.status||'active'}</span></div></div></div>
+    </div>
+    <div class="field"><label>User ID</label><input class="mono" value="${u.id}" disabled/></div>
+    <div class="field"><label>ETH Address</label><input class="mono" value="${u.ethAddress||'Not set'}" disabled/></div>
+    <div class="field"><label>Joined</label><input value="${fmtDate(u.createdAt)}" disabled/></div>
+  `;
+  document.getElementById('userDetailModal').classList.remove('hidden');
+}
+function closeUserDetail() { document.getElementById('userDetailModal').classList.add('hidden'); }
+function openBalanceModalFromDetail() {
+  closeUserDetail();
+  openBalanceModal(selectedUserId);
+}
+
+// ── BALANCE ADJUSTMENT ──
+function openBalanceModal(uid) {
+  const u = allUsers.find(x => x.id === uid);
+  if (!u) return;
+  selectedUserId = uid;
+  document.getElementById('modalCurrentBal').textContent = '$' + (parseFloat(u.balance)||0).toFixed(2);
+  document.getElementById('modalUserName').value = `${u.name||'Unnamed'} (${u.email||''})`;
+  document.getElementById('modalAmount').value = '';
+  document.getElementById('modalNote').value = '';
+  document.getElementById('balanceModal').classList.remove('hidden');
+}
+function closeBalanceModal() { document.getElementById('balanceModal').classList.add('hidden'); }
+
+async function submitBalanceChange() {
+  const u = allUsers.find(x => x.id === selectedUserId);
+  if (!u) return;
+  const action = document.getElementById('modalAction').value;
+  const amount = parseFloat(document.getElementById('modalAmount').value);
+  const note = document.getElementById('modalNote').value.trim();
+
+  if (!amount || amount < 0) { toast('Enter a valid amount', 'error'); return; }
+
+  const currentBal = parseFloat(u.balance) || 0;
+  let newBal = currentBal;
+  let txAmount = amount;
+
+  if (action === 'add') newBal = currentBal + amount;
+  else if (action === 'subtract') { newBal = Math.max(0, currentBal - amount); txAmount = -amount; }
+  else if (action === 'set') { newBal = amount; txAmount = amount - currentBal; }
+
+  try {
+    await FB.updateDoc(FB.doc(FB.db, 'users', selectedUserId), { balance: newBal });
+    await FB.addDoc(FB.collection(FB.db, 'transactions'), {
+      userId: selectedUserId,
+      userEmail: u.email || '',
+      type: txAmount >= 0 ? 'credit' : 'debit',
+      amount: txAmount,
+      note: note || `Admin ${action} adjustment`,
+      adminEmail: currentAdmin.email,
+      createdAt: FB.serverTimestamp(),
+    });
+    toast('Balance updated successfully!', 'success');
+    closeBalanceModal();
+    loadUsers();
+    loadDashboard();
+  } catch(e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+// ── PAYMENT REQUESTS ──
+async function loadPayments() {
+  const tbody = document.getElementById('paymentsTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Loading…</td></tr>';
+  try {
+    const snap = await FB.getDocs(FB.query(FB.collection(FB.db,'paymentRequests'), FB.orderBy('createdAt','desc')));
+    allPayments = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    if (!allPayments.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No payment requests yet. Users can submit these from the app when they make a UPI/bank payment.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = allPayments.map(p => `
+      <tr class="tbl-row">
+        <td>${p.userEmail||'—'}</td>
+        <td class="bal-amt">$${(parseFloat(p.amount)||0).toFixed(2)}</td>
+        <td>${p.method||'—'}</td>
+        <td class="mono" style="font-size:11px">${p.reference||'—'}</td>
+        <td><span class="badge ${p.status==='approved'?'active':p.status==='rejected'?'blocked':'pending'}">${p.status||'pending'}</span></td>
+        <td>${fmtDate(p.createdAt)}</td>
+        <td>
+          ${p.status==='pending' ? `
+            <button class="btn sm" onclick="approvePayment('${p.id}')">✓ Approve</button>
+            <button class="btn danger sm" onclick="rejectPayment('${p.id}')" style="margin-left:6px">✕ Reject</button>
+          ` : '<span style="color:var(--text3);font-size:12px">Processed</span>'}
+        </td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function approvePayment(id) {
+  const p = allPayments.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`Approve payment of $${p.amount} for ${p.userEmail}? This will credit their wallet.`)) return;
+  try {
+    await FB.updateDoc(FB.doc(FB.db,'paymentRequests',id), { status:'approved', processedAt: FB.serverTimestamp(), processedBy: currentAdmin.email });
+    // credit user balance
+    const userRef = FB.doc(FB.db,'users', p.userId);
+    const userSnap = await FB.getDoc(userRef);
+    const currentBal = parseFloat(userSnap.data()?.balance) || 0;
+    await FB.updateDoc(userRef, { balance: currentBal + parseFloat(p.amount) });
+    await FB.addDoc(FB.collection(FB.db,'transactions'), {
+      userId: p.userId, userEmail: p.userEmail, type:'credit', amount: parseFloat(p.amount),
+      note: `Payment approved — ${p.method} Ref: ${p.reference}`, adminEmail: currentAdmin.email, createdAt: FB.serverTimestamp(),
+    });
+    toast('Payment approved & wallet credited!', 'success');
+    loadPayments(); loadUsers(); loadDashboard();
+  } catch(e) { toast('Failed: '+e.message,'error'); }
+}
+
+async function rejectPayment(id) {
+  if (!confirm('Reject this payment request?')) return;
+  try {
+    await FB.updateDoc(FB.doc(FB.db,'paymentRequests',id), { status:'rejected', processedAt: FB.serverTimestamp(), processedBy: currentAdmin.email });
+    toast('Payment rejected', 'success');
+    loadPayments(); loadDashboard();
+  } catch(e) { toast('Failed: '+e.message,'error'); }
+}
+
+// ── TRANSACTIONS ──
+async function loadAllTransactions() {
+  const tbody = document.getElementById('txTableBody');
+  tbody.innerHTML = '<tr><td colspan="5" class="empty-row">Loading…</td></tr>';
+  try {
+    const snap = await FB.getDocs(FB.query(FB.collection(FB.db,'transactions'), FB.orderBy('createdAt','desc')));
+    allTx = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    if (!allTx.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No transactions yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = allTx.slice(0,100).map(tx => `
+      <tr class="tbl-row">
+        <td>${tx.userEmail||'—'}</td>
+        <td><span class="badge ${tx.type==='credit'?'active':'blocked'}">${tx.type||'—'}</span></td>
+        <td class="bal-amt" style="color:${tx.amount>=0?'var(--green)':'var(--red)'}">${tx.amount>=0?'+':''}$${Math.abs(tx.amount||0).toFixed(2)}</td>
+        <td style="color:var(--text2);font-size:12px">${tx.note||'—'}</td>
+        <td>${fmtDate(tx.createdAt)}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Error: ${e.message}</td></tr>`;
+  }
+}
+
+// ── UTILS ──
+function fmtDate(ts) {
+  if (!ts?.seconds) return '—';
+  const d = new Date(ts.seconds * 1000);
+  return d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+}
+
+let toastTimer;
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type;
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+// Enter key submits login
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !document.getElementById('loginScreen').classList.contains('hidden')) {
+    doLogin();
+  }
+});
+</script>
+</body>
+</html>
