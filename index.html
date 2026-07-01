@@ -12,9 +12,6 @@
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
   import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, orderBy, onSnapshot, addDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-  /* ════════════════════════════════════════
-     🔧 PASTE YOUR FIREBASE CONFIG HERE
-     ════════════════════════════════════════ */
   const firebaseConfig = {
     apiKey: "AIzaSyD-8JkLO2D5KWBBNE1zo18HEWDlocjR7go",
     authDomain: "trustifywallet-a54fd.firebaseapp.com",
@@ -24,13 +21,21 @@
     appId: "1:222093056146:web:9657a86de4da16c6a22e4b"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+  try {
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    let db = null;
+    try { db = getFirestore(app); } catch(e) { console.warn('Firestore not available:', e); }
 
-  window.FB = { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut,
-    collection, doc, getDoc, getDocs, setDoc, updateDoc, query, orderBy, onSnapshot, addDoc, serverTimestamp, where };
-  window.dispatchEvent(new Event('firebase-ready'));
+    window.FB = { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut,
+      collection, doc, getDoc, getDocs, setDoc, updateDoc, query, orderBy, onSnapshot,
+      addDoc, serverTimestamp, where };
+    window.dispatchEvent(new Event('firebase-ready'));
+  } catch(e) {
+    console.error('Firebase init failed:', e);
+    window.FB_ERROR = e.message;
+    window.dispatchEvent(new Event('firebase-ready'));
+  }
 </script>
 
 <style>
@@ -503,19 +508,29 @@ let allTx = [];
 let selectedUserId = null;
 
 window.addEventListener('firebase-ready', initFirebase);
-// Also check immediately in case event already fired before this script ran
 if (window.FB) initFirebase();
 
 function initFirebase() {
-  if (FB) return; // already initialized
+  if (FB) return;
   FB = window.FB;
-  if (!FB) return;
 
-  // Show connected status on login screen
   const dot = document.getElementById('fbStatusDot');
   const txt = document.getElementById('fbStatusText');
+
+  if (window.FB_ERROR) {
+    if (dot) dot.style.background = '#ef4444';
+    if (txt) txt.textContent = 'Firebase error: ' + window.FB_ERROR;
+    return;
+  }
+
+  if (!FB?.auth) {
+    if (dot) dot.style.background = '#ef4444';
+    if (txt) txt.textContent = 'Firebase Auth not initialized';
+    return;
+  }
+
   if (dot) dot.style.background = '#22c55e';
-  if (txt) txt.textContent = 'Connected · Ready to sign in';
+  if (txt) txt.textContent = FB.db ? 'Connected · Ready to sign in' : 'Auth connected · Create Firestore DB to continue';
 
   document.getElementById('fbProjectId').textContent = FB.auth.app.options.projectId || '—';
 
@@ -529,12 +544,11 @@ function initFirebase() {
   });
 }
 
-// Show "not connected" if Firebase takes too long
 setTimeout(() => {
   if (!FB) {
     const txt = document.getElementById('fbStatusText');
     const dot = document.getElementById('fbStatusDot');
-    if (txt) txt.textContent = 'Firebase not connected — check config';
+    if (txt) txt.textContent = 'Not connected — check internet / config';
     if (dot) dot.style.background = '#ef4444';
   }
 }, 6000);
@@ -646,6 +660,11 @@ function toggleSidebar(force) {
 
 // ── DASHBOARD ──
 async function loadDashboard() {
+  if (!FB?.db) {
+    document.getElementById('activityFeed').innerHTML = '<div class="empty-row" style="color:var(--gold)">⚠ Firestore not set up yet. Create the database in Firebase Console first.</div>';
+    document.getElementById('recentUsersBody').innerHTML = '<tr><td colspan="4" class="empty-row" style="color:var(--gold)">Firestore database not created yet.</td></tr>';
+    return;
+  }
   try {
     const usersSnap = await FB.getDocs(FB.collection(FB.db, 'users'));
     allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
