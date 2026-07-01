@@ -227,6 +227,10 @@ tr.tbl-row:hover{background:var(--card)}
     </div>
     <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
     <div id="loginErr" class="login-err hidden"></div>
+    <div id="fbStatus" style="text-align:center;font-size:11px;color:#4b5563;margin-top:14px;display:flex;align-items:center;justify-content:center;gap:6px">
+      <span id="fbStatusDot" style="width:6px;height:6px;border-radius:50%;background:#4b5563;display:inline-block"></span>
+      <span id="fbStatusText">Connecting to Firebase…</span>
+    </div>
     <div class="login-note">Authorized personnel only · Trustify Admin Console</div>
   </div>
 </div>
@@ -498,8 +502,21 @@ let allPayments = [];
 let allTx = [];
 let selectedUserId = null;
 
-window.addEventListener('firebase-ready', () => {
+window.addEventListener('firebase-ready', initFirebase);
+// Also check immediately in case event already fired before this script ran
+if (window.FB) initFirebase();
+
+function initFirebase() {
+  if (FB) return; // already initialized
   FB = window.FB;
+  if (!FB) return;
+
+  // Show connected status on login screen
+  const dot = document.getElementById('fbStatusDot');
+  const txt = document.getElementById('fbStatusText');
+  if (dot) dot.style.background = '#22c55e';
+  if (txt) txt.textContent = 'Connected · Ready to sign in';
+
   document.getElementById('fbProjectId').textContent = FB.auth.app.options.projectId || '—';
 
   FB.onAuthStateChanged(FB.auth, (user) => {
@@ -510,7 +527,17 @@ window.addEventListener('firebase-ready', () => {
       showLogin();
     }
   });
-});
+}
+
+// Show "not connected" if Firebase takes too long
+setTimeout(() => {
+  if (!FB) {
+    const txt = document.getElementById('fbStatusText');
+    const dot = document.getElementById('fbStatusDot');
+    if (txt) txt.textContent = 'Firebase not connected — check config';
+    if (dot) dot.style.background = '#ef4444';
+  }
+}, 6000);
 
 function showLogin() {
   document.getElementById('loginScreen').classList.remove('hidden');
@@ -539,14 +566,33 @@ async function doLogin() {
     return;
   }
 
+  // Wait for Firebase to be ready if it isn't yet
+  if (!window.FB) {
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    await new Promise(resolve => {
+      window.addEventListener('firebase-ready', resolve, { once: true });
+      setTimeout(resolve, 5000); // fallback timeout
+    });
+    FB = window.FB;
+  }
+
+  if (!FB) {
+    errEl.textContent = 'Firebase not connected. Check your internet connection.';
+    errEl.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Sign In';
+    return;
+  }
+
   btn.disabled = true; btn.textContent = 'Signing in…';
   try {
     await FB.signInWithEmailAndPassword(FB.auth, email, pass);
+    // onAuthStateChanged will handle showing the app
   } catch (e) {
+    console.error('Login error:', e);
     errEl.textContent = mapAuthError(e.code);
     errEl.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Sign In';
   }
-  btn.disabled = false; btn.textContent = 'Sign In';
 }
 
 function mapAuthError(code) {
