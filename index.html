@@ -677,7 +677,7 @@ async function loadDashboard() {
     const sorted = [...allUsers].sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     const recentBody = document.getElementById('recentUsersBody');
     if (!sorted.length) {
-      recentBody.innerHTML = '<tr><td colspan="4" class="empty-row">No users yet — they\\'ll appear here once people sign up.</td></tr>';
+      recentBody.innerHTML = '<tr><td colspan="4" class="empty-row">No users yet — they will appear here once people sign up.</td></tr>';
     } else {
       recentBody.innerHTML = sorted.slice(0,5).map(u => `
         <tr class="tbl-row" style="cursor:pointer" onclick="openUserDetail('${u.id}')">
